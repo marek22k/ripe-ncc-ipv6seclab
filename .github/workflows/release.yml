@@ -1,0 +1,47 @@
+
+name: Release
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v4
+      - name: Download tools
+        id: download-tools
+        run: sudo apt-get --yes install virt-v2v libguestfs-tools qemu-utils libnbd-bin
+      - name: Download box informations
+        id: download-box-informations
+        run: |
+          ipv6seclab=$(curl --silent --location "https://vagrantcloud.com/api/v2/vagrant/ripencc/ipv6seclab")
+          url=$(echo "$ipv6seclab" | jq --raw-output '.versions[0] | .providers[] | select(.name == "virtualbox") | .url')
+          version=$(echo "$ipv6seclab" | jq --raw-output '.versions[0] | .version')
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Download box
+        id: download-box
+        env:
+          URL: ${{ steps.download-box-information.outputs.url }}
+        run: curl --silent --location --output "box.tar.gz" "$URL"
+      - name: Create OVA
+        id: create-ova
+        run: tar cvf ipv6seclab.ova box.ovf box-disk001.vmdk box-disk002.vmdk
+      - name: Convert to qemu/kvm
+        id: virt-v2v
+        run: |
+          mkdir -p ipv6seclab_out
+          virt-v2v -i ova ipv6seclab.ova -o local -os ./ipv6seclab_out
+      - name: Create tar
+        id: compress-output
+        run: tar cJf ipv6seclab_out.tar.xz ipv6seclab_out/
+      - uses: actions/upload-artifact@v4
+        id: upload-artifact
+        with:
+          name: ipv6seclab
+          path: ipv6seclab_out.tar.xz
