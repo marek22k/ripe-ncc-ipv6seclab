@@ -27,8 +27,11 @@ jobs:
       - name: Download box
         id: download-box
         env:
-          URL: ${{ steps.download-box-information.outputs.url }}
-        run: curl --silent --location --output "box.tar.gz" "$URL"
+          URL: ${{ steps.download-box-informations.outputs.url }}
+        run: curl --location --output "box.tar.gz" "$URL"
+      - name: Extract box
+        id: extract-box
+        run: tar xvzf box.tar.gz ./box.ovf ./box-disk001.vmdk ./box-disk002.vmdk
       - name: Create OVA
         id: create-ova
         run: tar cvf ipv6seclab.ova box.ovf box-disk001.vmdk box-disk002.vmdk
@@ -36,10 +39,10 @@ jobs:
         id: virt-v2v
         run: |
           mkdir -p ipv6seclab_out
-          virt-v2v -i ova ipv6seclab.ova -o local -os ./ipv6seclab_out
+          sudo LIBGUESTFS_NETWORK=0 LIBGUESTFS_BACKEND=direct virt-v2v -v -x -i ova ipv6seclab.ova -o local -os ./ipv6seclab_out
       - name: Create tar
         id: compress-output
-        run: tar cJf ipv6seclab_out.tar.xz ipv6seclab_out/
+        run: tar cvJf ipv6seclab_out.tar.xz ipv6seclab_out/
       - uses: actions/upload-artifact@v4
         id: upload-artifact
         with:
